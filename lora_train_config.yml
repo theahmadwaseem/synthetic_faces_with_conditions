@@ -1,0 +1,99 @@
+---
+# Reusable AI Toolkit configuration for facial skin-condition LoRA training.
+# Before training, replace CONDITION_LORA_NAME, CONDITION_TRIGGER, and
+# path/to/condition_training_images with values for the selected condition.
+# Each image should have a corresponding .txt caption file.
+job: extension
+
+config:
+  name: "CONDITION_LORA_NAME"
+
+  process:
+    - type: "sd_trainer"
+      training_folder: "output"
+      device: cuda:0
+      trigger_word: "CONDITION_TRIGGER"
+
+      network:
+        type: "lora"
+        linear: 32
+        linear_alpha: 32
+
+      save:
+        dtype: float16
+        save_every: 200
+        max_step_saves_to_keep: 9
+        push_to_hub: false
+
+      datasets:
+        - folder_path: "path/to/condition_training_images"
+          caption_ext: "txt"
+          caption_dropout_rate: 0.03
+          shuffle_tokens: false
+          cache_latents_to_disk: true
+          resolution: [512, 768, 1024]
+
+      train:
+        batch_size: 1
+        bypass_guidance_embedding: true
+        steps: 3000
+        gradient_accumulation: 1
+        train_unet: true
+        train_text_encoder: false
+        gradient_checkpointing: true
+        noise_scheduler: "flowmatch"
+        timestep_type: "sigmoid"
+        optimizer: "adamw8bit"
+        lr: 1e-4
+        optimizer_params:
+          weight_decay: 1e-5
+        ema_config:
+          use_ema: false
+          ema_decay: 0.99
+        dtype: bf16
+
+      model:
+        arch: "flux2_klein_4b"
+        name_or_path: "black-forest-labs/FLUX.2-klein-base-4B"
+        quantize: true
+        qtype: "qfloat8"
+        quantize_te: true
+        qtype_te: "qfloat8"
+        low_vram: true
+        layer_offloading: true
+        layer_offloading_transformer_percent: 0.85
+        layer_offloading_text_encoder_percent: 1.0
+
+      sample:
+        sampler: "flowmatch"
+        sample_every: 200
+        sample_start_step: 0
+        width: 1024
+        height: 1024
+        # Generic, matched prompts for comparing the learned condition
+        # across identities and viewpoints. [trigger] is an AI Toolkit token.
+        prompts:
+          - "[trigger], realistic frontal portrait of an adult woman, natural skin texture, neutral background, soft daylight"
+          - "[trigger], realistic frontal portrait of an adult man, natural skin texture, neutral background, soft daylight"
+          - "[trigger], realistic close-up portrait of an adult, detailed facial skin, even lighting"
+          - "[trigger], realistic three-quarter-view portrait of an adult, natural facial anatomy, soft lighting"
+          - "[trigger], realistic side-profile portrait of an adult, natural facial anatomy, neutral background"
+          - "[trigger], realistic frontal portrait of a dark-skinned adult, natural skin texture, soft daylight"
+          - "[trigger], realistic frontal portrait of a light-skinned adult, natural skin texture, soft daylight"
+          - "[trigger], realistic clinical facial photograph of an adult, visible facial skin condition, evenly lit, neutral background"
+          - "realistic frontal portrait of an adult woman, natural skin texture, neutral background, soft daylight"
+          - "realistic frontal portrait of an adult man, natural skin texture, neutral background, soft daylight"
+          - "realistic close-up portrait of an adult, detailed facial skin, even lighting"
+          - "realistic three-quarter-view portrait of an adult, natural facial anatomy, soft lighting"
+          - "realistic side-profile portrait of an adult, natural facial anatomy, neutral background"
+          - "realistic frontal portrait of a dark-skinned adult, natural skin texture, soft daylight"
+          - "realistic frontal portrait of a light-skinned adult, natural skin texture, soft daylight"
+        neg: ""
+        seed: 42
+        walk_seed: false
+        guidance_scale: 4
+        sample_steps: 25
+
+meta:
+  name: "[name]"
+  version: "1.0"
