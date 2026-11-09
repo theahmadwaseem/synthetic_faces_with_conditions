@@ -1,6 +1,76 @@
-**SyncFaceMark: A Synthetic Face Dataset with Localized Skin Conditions, Scars, and
-Marks for Vision Research**
+# SyncFaceMark: A Synthetic Face Dataset with Localized Skin Conditions, Scars, and Marks for Vision Research 
 
-Robust face recognition requires handling diverse facial appearance variations encountered in real-world populations. However, existing large-scale face datasets predominantly capture conventional variations in pose, illumination, and expression, while localized attributes such as birthmarks, moles, scars, vitiligo, pigmentation variations, and tattoos remain underrepresented. These attributes can affect learned biometric representations and, when persistent, provide complementary identity cues. The lack of large-scale, diverse, and controllable datasets containing such variations limits systematic evaluation of face-recognition robustness. Although recent image generation models produce photorealistic faces, our evaluation of open-weight and commercial models reveals limitations in attribute localization, identity preservation, diversity, and computational accessibility. To address these challenges, we introduce a synthetic facial dataset and a two-stage generation framework that decouples identity synthesis from localized appearance manipulation. First, synthetic identities are generated using the established Idiap StyleGAN-based framework. Next, FLUX.2-Klein-4B is adapted using LoRA on publicly available data captioned with Qwen3-VL to learn localized appearance patterns without learning source identities and is used to transfer these attributes onto independently generated faces while preserving identity. We evaluate identity diversity, clean-to-edited identity similarity, and controlled multi-condition variations applied to the same identities. Multiple pretrained face-recognition models assess biometric consistency, complemented by visual inspection of attribute presence and localization. Together, our dataset and computationally accessible framework provide a scalable resource for systematically evaluating face recognition robustness to localized appearance variations.
+**Abstract:** Robust face recognition requires handling diverse facial appearance variations encountered in real-world populations. However, existing large-scale face datasets predominantly capture conventional variations in pose, illumination, and expression, while localized attributes such as birthmarks, moles, scars, vitiligo, pigmentation variations, and tattoos remain underrepresented. These attributes can affect learned biometric representations and, when persistent, provide complementary identity cues. The lack of large-scale, diverse, and controllable datasets containing such variations limits systematic evaluation of face-recognition robustness. Although recent image generation models produce photorealistic faces, our evaluation of open-weight and commercial models reveals limitations in attribute localization, identity preservation, diversity, and computational accessibility. To address these challenges, we introduce a synthetic facial dataset and a two-stage generation framework that decouples identity synthesis from localized appearance manipulation. First, synthetic identities are generated using the established Idiap StyleGAN-based framework. Next, FLUX.2-Klein-4B is adapted using LoRA on publicly available data captioned with Qwen3-VL to learn localized appearance patterns without learning source identities and is used to transfer these attributes onto independently generated faces while preserving identity. We evaluate identity diversity, clean-to-edited identity similarity, and controlled multi-condition variations applied to the same identities. Multiple pretrained face-recognition models assess biometric consistency, complemented by visual inspection of attribute presence and localization. Together, our dataset and computationally accessible framework provide a scalable resource for systematically evaluating face recognition robustness to localized appearance variations.
 
 Here is the dataset link: https://anonymous-hf.com/a/zgvchfgi3emp/
+
+## Experimental Evaluation of Synthetic Face Generation Models
+
+The code and experiments in this section were developed to explore and evaluate different generative models initially considered for creating synthetic facial identities. However, due to the limited identity diversity and variations observed in the generated images, these approaches were not used for the final dataset. Instead, the [Face Synthetics](https://github.com/idiap/face_synthetics) framework, based on **StyleGAN3**, was adopted to generate the synthetic identities used in the dataset. The experimental scripts are provided for transparency, reproducibility, and future research.
+
+### Face Portrait Prompt Generation
+
+prompt_generation_face.ipynb notebook generates realistic facial portrait prompts by sampling demographic and facial attributes from predefined probability distributions. It uses **Qwen3-14B** to transform sampled attributes into detailed, natural-language prompts for subsequent image generation. The generated prompts and their corresponding attributes are saved as CSV files, organized by gender.
+
+**Requirements:** Attribute-distribution files are required. Users must configure the input and output directories at the beginning of the notebook before execution.
+
+**Output:** CSV files containing generated prompts, prompt IDs, and associated facial attributes.
+
+### Face Image Generation
+
+face_generation.ipynb notebook generates synthetic facial images using **FLUX.2-klein-4B** (`black-forest-labs/FLUX.2-klein-4B`) from Black Forest Labs. It processes the facial Prompts generated in the previous prompt-generation stage and produces 1024 × 1024 facial images using the FLUX.2 diffusion pipeline. The generated images are saved alongside CSV metadata containing their corresponding prompts, seeds, and skin-condition labels.
+
+**Requirements:** Access to the pretrained FLUX.2-klein-4B model.
+
+**Input:** CSV files generated by the face prompt-generation notebook, located in `prompts_files/`. Each CSV file must contain a `prompt` column and may optionally include a `skin_condition` column.
+
+**Output:** Generated PNG images organized into separate directories corresponding to the input CSV filenames (e.g., `generated_images/face_generation_male/` and `generated_images/face_generation_female/`). Each directory includes a metadata CSV file containing the generated image filenames, prompts, seeds, and skin-condition information.
+
+
+### Face Variation Prompt Generation
+
+prompt_generation_variation.ipynb notebook generates facial image-editing prompts by sampling variations in pose, lighting, background, clothing, hairstyle, facial hair, makeup, and accessories from predefined probability distributions. It also uses **Qwen3-14B**. By default, 16 variation prompts are generated per input identity, and the results are saved as gender-specific CSV files.
+
+**Requirements:** Input face images, and attribute-variation distribution files.
+
+**Input:** Face images organized into `generated_images/face_generation_male/` and `generated_images/face_generation_female/`, along with variation probability files in the `variations/` directory.
+
+**Configuration:** Set `INPUT_FOLDER`, `VARIATION_DIR`, and `OUTPUT_DIR` at the beginning of the notebook. The number of variations per identity and generation parameters can also be modified.
+
+**Output:** CSV files (`face_variation_male.csv` and `face_variation_female.csv`) containing sampled variation attributes, generated editing prompts, and a negative prompt for subsequent image-editing tasks.
+
+**Note:** The notebook generates editing Prompts rather than edited images. The original input images and variation-distribution files must be supplied separately.
+
+### Face Image Editing
+
+This notebook generates facial image variations using **FireRed-Image-Edit-1.1** (`FireRedTeam/FireRed-Image-Edit-1.1`) through the Hugging Face Diffusers framework. It applies previously generated editing prompts to synthetic reference face images to modify attributes such as pose, lighting, hairstyle, clothing, background, and accessories while aiming to preserve facial identity. By default, 10 variations are generated for each reference image, and the edited images are saved alongside metadata containing their prompts, random seeds, and generation parameters.
+
+**Requirements:** Access to the FireRed-Image-Edit-1.1 model. 
+
+**Input:** Reference facial images organized into `generated_images/face_generation_male/` and `generated_images/face_generation_female/`. The editing instructions are loaded from `prompts_files/face_variation_male.csv` and `face_variation_female.csv`, or from a shared `face_variations.csv`.
+
+**Configuration:** Set `INPUT_FOLDER`, `PROMPT_FILES_DIR`, and `OUTPUT_DIR` at the beginning of the notebook.
+
+**Output:** Edited PNG images organized by gender and reference image under `edited_outputs/`. Each gender directory includes an `editing_metadata.csv` file recording the reference image, editing prompts, output filename, random seed, and inference parameters.
+
+**Note:** The standalone implementation uses the native Diffusers model rather than the GGUF checkpoint used in the original ComfyUI workflow. The default configuration uses 40 inference steps and a guidance scale of 4.0. An optional 8-step Lightning configuration is available for compatible LoRA weights. Exact results may differ between implementations. Furthermore, if there is any issue running this given notebook, try with [default comfyui workflow](https://huggingface.co/FireRedTeam/FireRed-Image-Edit-1.1-ComfyUI)). 
+
+### LoRA Training and Checkpoint Availability
+
+The condition-specific LoRA models were trained using [AI Toolkit](https://github.com/ostris/ai-toolkit) by modifying the provided `lora_train_config.yml` configuration file for each facial skin condition, including the corresponding training parameters. The resulting **LoRA adapter checkpoints (`.safetensors`)** were subsequently used with FLUX.2-klein-4B to generate synthetic facial images exhibiting the targeted skin conditions.
+
+**Checkpoint Availability:** The trained LoRA adapter weights are not publicly released due to potential privacy leakage risks, particularly the possibility of reconstructing or revealing facial identities represented in the training data. However, the training configuration and inference scripts are provided to support transparency and reproducibility.
+
+### Skin Condition Application on Faces Using LoRA
+
+lora_apply_condition.ipynb notebook generates localized skin conditions using **FLUX.2-klein-4B** (`black-forest-labs/FLUX.2-klein-4B`) and condition-specific Low-Rank Adaptation (LoRA) models on synthetic faces generated with [Face Synthetics](https://github.com/idiap/face_synthetics) framework.  It applies trained LoRA weights to existing synthetic facial identities to introduce 12 different skin conditions, including acne scars, freckles, vitiligo, melasma, rosacea, and other skin characteristics, while aiming to preserve facial identity and non-target facial attributes. The generated images and corresponding metadata are saved separately for each condition and LoRA checkpoint.
+
+**Requirements:** Pretrained FLUX.2-klein-4B model weights, and trained condition-specific LoRA checkpoints.
+
+**Input:** Synthetic reference face images, a `face_area.txt` file specifying facial regions, and the corresponding LoRA checkpoint files (`.safetensors`) for each skin condition.
+
+**Configuration:** Set `BASE_IMAGES_DIR`, `FACE_AREAS_FILE`, `LORA_DIR`, and `OUTPUT_DIR` at the beginning of the notebook. 
+
+**Output:** Generated PNG images organized by skin condition, along with a `generation_metadata.csv` file containing the applied condition, LoRA checkpoint, facial region, original image filename, generation prompt, and random seed.
+
+**Note:** The notebook performs inference using previously trained LoRA checkpoints and does not include LoRA training. Users must provide the corresponding checkpoints separately. 
